@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/context/AuthContext";
 import Icon from "@/components/ui/icon";
 
 const HERO_IMG = "https://cdn.poehali.dev/projects/2d5b4196-61a2-4092-9b7e-d0b2304a31bb/files/84cc0e7f-3bbf-4b71-ab10-0d7850c11e3b.jpg";
@@ -111,6 +113,8 @@ const CHAT_MESSAGES = [
 type NavSection = "home" | "services" | "cleaners" | "portfolio" | "chat" | "rating";
 
 export default function Index() {
+  const navigate = useNavigate();
+  const { isAuthenticated, user } = useAuth();
   const [activeSection, setActiveSection] = useState<NavSection>("home");
   const [chatMessages, setChatMessages] = useState(CHAT_MESSAGES);
   const [chatInput, setChatInput] = useState("");
@@ -185,13 +189,33 @@ export default function Index() {
             ))}
           </div>
 
-          <button
-            onClick={() => setActiveSection("chat")}
-            className="hidden md:flex items-center gap-2 bg-accent text-accent-foreground font-semibold px-4 py-2 rounded-lg text-sm hover:opacity-90 transition-opacity"
-          >
-            <Icon name="MessageCircle" size={15} />
-            Написать клинеру
-          </button>
+          <div className="hidden md:flex items-center gap-2">
+            {isAuthenticated ? (
+              <button
+                onClick={() => navigate("/dashboard")}
+                className="flex items-center gap-2 bg-primary text-primary-foreground font-semibold px-4 py-2 rounded-lg text-sm hover:opacity-90 transition-opacity"
+              >
+                <img src={user?.avatar} alt="" className="w-5 h-5 rounded-full object-cover" />
+                Кабинет
+              </button>
+            ) : (
+              <>
+                <button
+                  onClick={() => navigate("/auth")}
+                  className="text-sm text-muted-foreground font-medium hover:text-foreground transition-colors px-3 py-2"
+                >
+                  Войти
+                </button>
+                <button
+                  onClick={() => navigate("/auth")}
+                  className="flex items-center gap-2 bg-accent text-accent-foreground font-semibold px-4 py-2 rounded-lg text-sm hover:opacity-90 transition-opacity"
+                >
+                  <Icon name="UserPlus" size={15} />
+                  Стать клинером
+                </button>
+              </>
+            )}
+          </div>
 
           <button className="md:hidden p-2" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
             <Icon name={mobileMenuOpen ? "X" : "Menu"} size={22} />
