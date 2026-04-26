@@ -1,4 +1,17 @@
-import { createContext, useContext, useState, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import {
+  apiLogin, apiRegister, apiGetMe, apiLogout,
+  apiUpdateProfile, apiGetPortfolio, apiAddPortfolioItem,
+  getSession,
+} from "@/lib/api";
+
+export interface PortfolioItem {
+  id: number | string;
+  title: string;
+  area: string;
+  time: string;
+  img: string;
+}
 
 export interface CleanerProfile {
   id: string;
@@ -14,16 +27,20 @@ export interface CleanerProfile {
   rating: number;
   reviews: number;
   completedJobs: number;
-  portfolio: { id: number; title: string; area: string; time: string; img: string }[];
+  portfolio: PortfolioItem[];
 }
 
 interface AuthContextType {
   user: CleanerProfile | null;
   isAuthenticated: boolean;
+  loading: boolean;
+  loginError: string;
   login: (email: string, password: string) => Promise<boolean>;
-  register: (data: RegisterData) => Promise<boolean>;
+  register: (data: RegisterData) => Promise<{ ok: boolean; error?: string }>;
   logout: () => void;
-  updateProfile: (data: Partial<CleanerProfile>) => void;
+  updateProfile: (data: Partial<CleanerProfile>) => Promise<void>;
+  addPortfolioItem: (item: { title: string; area: string; time: string }) => Promise<void>;
+  refreshPortfolio: () => Promise<void>;
 }
 
 export interface RegisterData {
@@ -36,71 +53,95 @@ export interface RegisterData {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-const DEMO_USER: CleanerProfile = {
-  id: "demo-1",
-  name: "Елена Соколова",
-  email: "elena@example.com",
-  phone: "+7 900 123-45-67",
-  specialty: "Генеральная уборка",
-  bio: "Профессиональный клинер с 5-летним опытом. Специализируюсь на генеральных уборках квартир и офисов. Использую только проверенные средства.",
-  price: "от 2 500 ₽",
-  tags: ["Квартиры", "Офисы", "Хим. чистка"],
-  avatar: "https://cdn.poehali.dev/projects/2d5b4196-61a2-4092-9b7e-d0b2304a31bb/files/1ea98bce-a6e9-4e7c-b7b4-6872483cd9fc.jpg",
-  verified: true,
-  rating: 4.9,
-  reviews: 127,
-  completedJobs: 312,
-  portfolio: [
-    { id: 1, title: "Генеральная уборка квартиры", area: "72 м²", time: "5 часов", img: "https://cdn.poehali.dev/projects/2d5b4196-61a2-4092-9b7e-d0b2304a31bb/files/f5145ac5-da33-4dad-8cce-eb757bd3d2d0.jpg" },
-    { id: 2, title: "Уборка офиса", area: "120 м²", time: "8 часов", img: "https://cdn.poehali.dev/projects/2d5b4196-61a2-4092-9b7e-d0b2304a31bb/files/f5145ac5-da33-4dad-8cce-eb757bd3d2d0.jpg" },
-    { id: 3, title: "Химчистка мягкой мебели", area: "Диван + 2 кресла", time: "3 часа", img: "https://cdn.poehali.dev/projects/2d5b4196-61a2-4092-9b7e-d0b2304a31bb/files/f5145ac5-da33-4dad-8cce-eb757bd3d2d0.jpg" },
-  ],
-};
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<CleanerProfile | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loginError, setLoginError] = useState("");
 
-  async function login(email: string, _password: string): Promise<boolean> {
-    await new Promise((r) => setTimeout(r, 800));
-    if (email === "elena@example.com") {
-      setUser(DEMO_USER);
+  // Восстановление сессии при загрузке
+  useEffect(() => {
+    const session = getSession();
+    if (!session) { setLoading(false); return; }
+    apiGetMe().then(async ({ status, data }) => {
+      if (status === 200) {
+        const profile = data as CleanerProfile;
+        const portfolio = await loadPortfolio(profile.id);
+        setUser({ ...profile, portfolio });
+      }
+      setLoading(false);
+    });
+  }, []);
+
+  async function loadPortfolio(cleanerId: string): Promise<PortfolioItem[]> {
+    const { status, data } = await apiGetPortfolio(cleanerId);
+    if (status === 200 && Array.isArray(data)) return data as PortfolioItem[];
+    return [];
+  }
+
+  async function login(email: string, password: string): Promise<boolean> {
+    setLoginError("");
+    const { status, data } = await apiLogin(email, password);
+    if (status === 200) {
+      const profile = data.cleaner as CleanerProfile;
+      const portfolio = await loadPortfolio(profile.id);
+      setUser({ ...profile, portfolio });
       return true;
     }
+    setLoginError((data as { error?: string }).error || "Неверный email или пароль");
     return false;
   }
 
-  async function register(data: RegisterData): Promise<boolean> {
-    await new Promise((r) => setTimeout(r, 1000));
-    const newUser: CleanerProfile = {
-      id: `user-${Date.now()}`,
-      name: data.name,
-      email: data.email,
-      phone: data.phone,
-      specialty: data.specialty,
-      bio: "",
-      price: "по договорённости",
-      tags: [],
-      avatar: "https://cdn.poehali.dev/projects/2d5b4196-61a2-4092-9b7e-d0b2304a31bb/files/1ea98bce-a6e9-4e7c-b7b4-6872483cd9fc.jpg",
-      verified: false,
-      rating: 0,
-      reviews: 0,
-      completedJobs: 0,
-      portfolio: [],
-    };
-    setUser(newUser);
-    return true;
+  async function register(regData: RegisterData): Promise<{ ok: boolean; error?: string }> {
+    const { status, data } = await apiRegister(regData);
+    if (status === 200) {
+      const profile = data.cleaner as CleanerProfile;
+      setUser({ ...profile, portfolio: [] });
+      return { ok: true };
+    }
+    return { ok: false, error: (data as { error?: string }).error || "Ошибка регистрации" };
   }
 
   function logout() {
+    apiLogout();
     setUser(null);
   }
 
-  function updateProfile(data: Partial<CleanerProfile>) {
-    setUser((prev) => prev ? { ...prev, ...data } : prev);
+  async function updateProfile(updates: Partial<CleanerProfile>) {
+    const { status, data } = await apiUpdateProfile(updates as Record<string, unknown>);
+    if (status === 200) {
+      setUser((prev) => prev ? { ...prev, ...(data as CleanerProfile) } : prev);
+    } else {
+      // Fallback — обновляем локально
+      setUser((prev) => prev ? { ...prev, ...updates } : prev);
+    }
+  }
+
+  async function addPortfolioItem(item: { title: string; area: string; time: string }) {
+    const { status, data } = await apiAddPortfolioItem(item);
+    if (status === 200) {
+      setUser((prev) => prev ? { ...prev, portfolio: [data as PortfolioItem, ...(prev.portfolio || [])] } : prev);
+    }
+  }
+
+  async function refreshPortfolio() {
+    if (!user) return;
+    const portfolio = await loadPortfolio(user.id);
+    setUser((prev) => prev ? { ...prev, portfolio } : prev);
   }
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, login, register, logout, updateProfile }}>
+    <AuthContext.Provider value={{
+      user,
+      isAuthenticated: !!user,
+      loading,
+      loginError,
+      login,
+      register,
+      logout,
+      updateProfile,
+      addPortfolioItem,
+      refreshPortfolio,
+    }}>
       {children}
     </AuthContext.Provider>
   );

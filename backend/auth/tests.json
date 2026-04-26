@@ -1,0 +1,32 @@
+{
+  "tests": [
+    {
+      "name": "GET ?action=me без сессии — 401",
+      "method": "GET",
+      "path": "/?action=me",
+      "expectedStatus": 401
+    },
+    {
+      "name": "POST ?action=register — успешная регистрация",
+      "method": "POST",
+      "path": "/?action=register",
+      "body": {
+        "name": "Тест Клинер",
+        "email": "test_cleaner_unique99@example.com",
+        "phone": "+7 900 000-00-00",
+        "specialty": "Генеральная уборка",
+        "password": "password123"
+      },
+      "expectedStatus": 200,
+      "expectedBody": { "session_id": "string" },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "POST ?action=login — неверный пароль",
+      "method": "POST",
+      "path": "/?action=login",
+      "body": { "email": "nonexistent@example.com", "password": "wrong" },
+      "expectedStatus": 401
+    }
+  ]
+}

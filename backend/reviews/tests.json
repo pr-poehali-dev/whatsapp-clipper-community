@@ -1,0 +1,23 @@
+{
+  "tests": [
+    {
+      "name": "GET без cleaner_id — 400",
+      "method": "GET",
+      "path": "/",
+      "expectedStatus": 400
+    },
+    {
+      "name": "GET с несуществующим cleaner_id — пустой массив",
+      "method": "GET",
+      "path": "/?cleaner_id=00000000-0000-0000-0000-000000000000",
+      "expectedStatus": 200
+    },
+    {
+      "name": "POST без текста — 400",
+      "method": "POST",
+      "path": "/",
+      "body": { "cleaner_id": "00000000-0000-0000-0000-000000000000", "rating": 5, "text": "" },
+      "expectedStatus": 400
+    }
+  ]
+}

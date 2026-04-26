@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
+import { apiGetReviews } from "@/lib/api";
 import Icon from "@/components/ui/icon";
 
 const PORTFOLIO_IMG = "https://cdn.poehali.dev/projects/2d5b4196-61a2-4092-9b7e-d0b2304a31bb/files/f5145ac5-da33-4dad-8cce-eb757bd3d2d0.jpg";
@@ -38,7 +39,7 @@ function StarRating({ rating }: { rating: number }) {
 }
 
 export default function Dashboard() {
-  const { user, logout, updateProfile } = useAuth();
+  const { user, logout, updateProfile, addPortfolioItem } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<Tab>("overview");
   const [editMode, setEditMode] = useState(false);
@@ -53,14 +54,23 @@ export default function Dashboard() {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [newPortfolio, setNewPortfolio] = useState({ title: "", area: "", time: "" });
   const [portfolioAdded, setPortfolioAdded] = useState(false);
+  const [realReviews, setRealReviews] = useState<{ id: string; author: string; rating: number; text: string; date: string }[]>([]);
+
+  useEffect(() => {
+    if (user?.id) {
+      apiGetReviews(user.id).then(({ status, data }) => {
+        if (status === 200 && Array.isArray(data)) setRealReviews(data as typeof realReviews);
+      });
+    }
+  }, [user?.id]);
 
   if (!user) {
     navigate("/auth");
     return null;
   }
 
-  function handleSaveProfile() {
-    updateProfile({
+  async function handleSaveProfile() {
+    await updateProfile({
       name: profileForm.name,
       phone: profileForm.phone,
       bio: profileForm.bio,
@@ -73,13 +83,12 @@ export default function Dashboard() {
     setTimeout(() => setSaveSuccess(false), 3000);
   }
 
-  function handleAddPortfolio() {
+  async function handleAddPortfolio() {
     if (!newPortfolio.title) return;
-    updateProfile({
-      portfolio: [
-        ...(user.portfolio || []),
-        { id: Date.now(), title: newPortfolio.title, area: newPortfolio.area, time: newPortfolio.time, img: PORTFOLIO_IMG },
-      ],
+    await addPortfolioItem({
+      title: newPortfolio.title,
+      area: newPortfolio.area,
+      time: newPortfolio.time,
     });
     setNewPortfolio({ title: "", area: "", time: "" });
     setPortfolioAdded(true);
@@ -407,7 +416,7 @@ export default function Dashboard() {
             </div>
 
             <div className="flex flex-col gap-3">
-              {MOCK_REVIEWS.map((r) => (
+              {(realReviews.length > 0 ? realReviews : MOCK_REVIEWS).map((r) => (
                 <div key={r.id} className="bg-card border border-border rounded-2xl p-5">
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2.5">

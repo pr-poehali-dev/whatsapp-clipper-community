@@ -19,7 +19,7 @@ export default function Auth() {
   const [mode, setMode] = useState<"login" | "register">("login");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const { login, register } = useAuth();
+  const { login, register, loginError } = useAuth();
   const navigate = useNavigate();
 
   const [loginForm, setLoginForm] = useState({ email: "", password: "" });
@@ -34,7 +34,7 @@ export default function Auth() {
     const ok = await login(loginForm.email, loginForm.password);
     setLoading(false);
     if (ok) navigate("/dashboard");
-    else setError("Неверный email или пароль. Попробуйте: elena@example.com");
+    else setError(loginError || "Неверный email или пароль");
   }
 
   async function handleRegister(e: React.FormEvent) {
@@ -49,9 +49,10 @@ export default function Auth() {
       return;
     }
     setLoading(true);
-    const ok = await register(regForm);
+    const result = await register(regForm);
     setLoading(false);
-    if (ok) navigate("/dashboard");
+    if (result.ok) navigate("/dashboard");
+    else setError(result.error || "Ошибка регистрации");
   }
 
   return (
@@ -170,9 +171,7 @@ export default function Auth() {
                 </button>
               </p>
 
-              <div className="border border-border rounded-xl p-3 bg-secondary/50 text-xs text-muted-foreground">
-                <span className="font-medium text-foreground">Демо-вход:</span> elena@example.com / любой пароль
-              </div>
+
             </form>
           ) : (
             <form onSubmit={handleRegister} className="flex flex-col gap-4">

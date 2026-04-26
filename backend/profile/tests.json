@@ -1,0 +1,17 @@
+{
+  "tests": [
+    {
+      "name": "GET / — список клинеров",
+      "method": "GET",
+      "path": "/",
+      "expectedStatus": 200
+    },
+    {
+      "name": "PUT / без сессии — 401",
+      "method": "PUT",
+      "path": "/",
+      "body": { "name": "Новое имя" },
+      "expectedStatus": 401
+    }
+  ]
+}
